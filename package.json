@@ -15,7 +15,9 @@
     "validate": "bun run scopes/knowledge.validator/validate.runner.ts",
     "validate:shards": "bun run scripts/validate-shards.ts",
     "sync": "bun run scripts/sync-from-tigris.ts",
-    "cron": "bun run scripts/cron/schedule.ts"
+    "cron": "bun run scripts/cron/schedule.ts",
+    "typecheck:tsgo": "tsgo --noEmit --project tsconfig.tsgo.json",
+    "typecheck:all": "tsc --noEmit && tsgo --noEmit --project tsconfig.tsgo.json"
   },
   "dependencies": {
     "parse5": "^7.1.2",
@@ -28,6 +30,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "eslint": "^9.0.0",
     "prettier": "^3.3.0",
     "typescript": "^5.5.0",

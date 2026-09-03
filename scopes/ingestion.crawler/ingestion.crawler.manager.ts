@@ -4,6 +4,7 @@ import { createLogger } from "@core/platform/logger.js"
 import { getDb } from "@core/platform/db.mongo.js"
 import { tigrisPut, tigrisKeyForHash, tigrisMetaKeyForHash, tigrisUsageBytes } from "@core/platform/storage.tigris.js"
 import { githubPutMedia, githubMediaPathForHash } from "@core/platform/storage.github.js"
+import { discordLogShard, discordLogMain, auditLog } from "@core/platform/discord.js"
 import { CRAWLER_CONFIG, MEDIA_CONTENT_TYPES, MEDIA_EXTENSIONS } from "./ingestion.crawler.constants.js"
 import { CrawlConnector } from "./ingestion.crawler.connector.js"
 
@@ -50,7 +51,7 @@ export class CrawlManager {
     const checkpoints = db ? await db.collection("shard_checkpoints").find().sort({ stoppedAt: -1 }).toArray() : []
     this.logger.info("crawl.start", { shardId: this.shardId, shardTotal: this.shardTotal, done: done.size, checkpoints: checkpoints.length })
 
-    for (const s of seeds) if (!done.has(s) && this.shouldHandle(s)) this.queue.push(s)
+    for (const s of seeds) if (!done.has(s)) this.queue.push(s) // seeds always enqueued, sharding via shouldHandle on discovered links only
 
     let count = 0
     let lastUrl = ""
@@ -71,21 +72,53 @@ export class CrawlManager {
     process.on("SIGTERM", () => { void onStop("SIGTERM") })
     process.on("SIGINT", () => { void onStop("SIGINT") })
 
-    try {
-      while (this.queue.length > 0) {
-        const url = this.queue.shift()!
+    const concurrency = (CRAWLER_CONFIG as any).concurrency ?? 8
+    this.logger.info("crawl.fast_start", { concurrency, rateMs: CRAWLER_CONFIG.rateLimitMs, shardId: this.shardId })
+
+    let active = 0
+    const worker = async (wid: number) => {
+      while (true) {
+        const url = this.queue.shift()
+        if (!url) {
+          if (active === 0 && this.queue.length === 0) break
+          await new Promise(r => setTimeout(r, 50))
+          continue
+        }
+        // sharding: only this shard handles its slice, others skip but count as seen to avoid re-enqueue
+        if (!this.shouldHandle(url)) {
+          this.seen.add(url)
+          continue
+        }
         if (this.seen.has(url) || done.has(url)) continue
         this.seen.add(url)
         lastUrl = url
-        await this.fetchAndStore(url)
-        count++
-        if (count % CRAWLER_CONFIG.checkpointEvery === 0) await onStop("checkpoint")
+        if (process.env.CRAWL_LIMIT && count >= Number(process.env.CRAWL_LIMIT)) break
+        active++
+        const start = Date.now()
+        try {
+          await this.fetchAndStore(url)
+          count++
+          if (count % 10 === 0) discordLogShard({ shardId: this.shardId, level: "info", title: "Crawled", description: `Stored \`${lastUrl.slice(0,60)}\``, fields: [{ name: "sha", value: lastUrl.slice(0,8), inline: true }, { name: "queue", value: String(this.queue.length), inline: true }, { name: "done", value: String(count), inline: true }], traceId: this.traceId })
+          if (count % CRAWLER_CONFIG.checkpointEvery === 0) await onStop("checkpoint")
+          this.logger.info("crawl.worker_tick", { wid, url: url.slice(0,60), ms: Date.now()-start, queued: this.queue.length, done: count })
+        } catch (e) {
+          this.logger.warn("crawl.worker_error", { wid, url: url.slice(0,60), error: String(e).slice(0,200) })
+        } finally {
+          active--
+        }
         await this.sleepWithJitter()
+        if (process.env.CRAWL_LIMIT && count >= Number(process.env.CRAWL_LIMIT)) break
       }
+    }
+
+    try {
+      await Promise.all(Array.from({ length: concurrency }, (_, i) => worker(i)))
       await onStop("complete")
-      this.logger.info("crawl.complete", { doneCount: count })
+      this.logger.info("crawl.complete", { doneCount: count, concurrency })
+      discordLogMain({ level: "success", title: "Crawl done", description: `Shard ${this.shardId} finished`, fields: [{ name: "done", value: String(count), inline: true }, { name: "concurrency", value: String(concurrency), inline: true }], traceId: this.traceId, mention: true }); auditLog("crawl.done", { shardId: this.shardId, done: count }, this.traceId)
     } catch (e) {
       this.logger.error("crawl.error", { error: String(e) })
+      discordLogMain({ level: "error", title: "Crawl error", description: String(e).slice(0,300), fields: [{ name: "shard", value: String(this.shardId), inline: true }], traceId: this.traceId, mention: true }); auditLog("crawl.error", { shardId: this.shardId, error: String(e).slice(0,100) }, this.traceId)
       await onStop("error")
       throw e
     }
@@ -115,6 +148,7 @@ export class CrawlManager {
     }
 
     const usage = await this.tigrisUsageSafe()
+    if (status === 429) { discordLogMain({ level: "warn", title: "Rate limited", description: `429 on \`${url.slice(0,60)}\` shard ${this.shardId}`, fields: [{ name: "url", value: url.slice(0,80), inline: false }], traceId: this.traceId, mention: true }); auditLog("crawl.rate_limited", { url, shardId: this.shardId }, this.traceId) }
     if (usage > 8 * 1024 * 1024 * 1024) {
       this.logger.warn("crawl.tigris_near_limit", { usage })
     }
@@ -138,6 +172,7 @@ export class CrawlManager {
     }
 
     this.logger.info("crawl.stored_tigris", { url, sha256, key, links: this.queue.length, durationMs: Date.now() - start })
+    // removed discord log from fetchAndStore (count not in scope)
   }
 
   private isMedia(url: string, ct: string): boolean {

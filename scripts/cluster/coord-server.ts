@@ -1,5 +1,6 @@
 import { createLogger, newTraceId } from "../../core/platform/logger.js"
 import { getDb } from "../../core/platform/db.mongo.js"
+import { discordLogMain, discordLogShard, auditLog } from "../../core/platform/discord.js"
 
 type Peer = { nodeId: string; shardId: number; role: string; tunnelUrl: string; crawled: number; queueLen: number; lastSeen: string }
 const peers = new Map<string, Peer>()
@@ -46,12 +47,15 @@ Bun.serve({
       peer.lastSeen = new Date().toISOString()
       peers.set(peer.nodeId, peer)
       logger.info("coord.register", { peer: peer.nodeId, tunnel: peer.tunnelUrl })
+      discordLogMain({ level: "info", title: "Peer joined", description: `Node \`${peer.nodeId}\` joined mesh`, fields: [{ name: "role", value: peer.role, inline: true }, { name: "shard", value: String(peer.shardId), inline: true }, { name: "tunnel", value: peer.tunnelUrl.slice(0,40), inline: false }], traceId: peer.nodeId })
+      auditLog("cluster.peer_joined", { nodeId: peer.nodeId, role: peer.role, shardId: peer.shardId })
       broadcast("peer_joined", peer)
       return Response.json({ ok: true, peers: [...peers.values()] })
     }
     if (url.pathname === "/checkpoint" && req.method === "POST") {
       const body = await req.json() as { url: string; shardId: number; nodeId: string }
       logger.info("coord.checkpoint", { url: body.url.slice(0,80), nodeId: body.nodeId })
+      if (Math.random() < 0.1) discordLogShard({ shardId: body.shardId ?? 0, level: "info", title: "Gossip", description: `Checkpoint \`${body.url.slice(0,50)}\``, fields: [{ name: "node", value: body.nodeId, inline: true }], traceId: body.nodeId })
       broadcast("checkpoint", body)
       const db = await getDb().catch(() => null)
       if (db) await db.collection("cluster_gossip").insertOne({ ...body, at: new Date().toISOString() }).catch(()=>{})
@@ -78,6 +82,7 @@ setInterval(() => {
     if (now - new Date(p.lastSeen).getTime() > 30000) {
       peers.delete(id)
       logger.warn("coord.peer_timeout", { peer: id })
+      discordLogMain({ level: "warn", title: "Peer timeout", description: `Node \`${id}\` timed out`, traceId: id, mention: true }); auditLog("cluster.peer_timeout", { nodeId: id })
       broadcast("peer_left", { nodeId: id })
     }
   }

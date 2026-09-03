@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
     "declaration": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
@@ -22,6 +21,9 @@
       ],
       "@scopes/*": [
         "./scopes/*"
+      ],
+      "*": [
+        "./*"
       ]
     },
     "rootDir": ".",
