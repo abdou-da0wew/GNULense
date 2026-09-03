@@ -1,0 +1,84 @@
+{
+  "project": ".",
+  "generatedAt": "",
+  "scopes": [
+    {
+      "path": "scopes/ingestion.crawler",
+      "type": "scope",
+      "scope": "ingestion.crawler",
+      "description": "crawler.runner.ts, index.ts, ingestion.crawler.connector.ts, ingestion.crawler.constants.ts, ingestion.crawler.handler.ts, ingestion.crawler.manager.ts"
+    },
+    {
+      "path": "scopes/knowledge.parser",
+      "type": "scope",
+      "scope": "knowledge.parser",
+      "description": "index.ts, knowledge.parser.constants.ts, knowledge.parser.handler.ts, knowledge.parser.manager.ts, parser.runner.ts"
+    },
+    {
+      "path": "scopes/knowledge.validator",
+      "type": "scope",
+      "scope": "knowledge.validator",
+      "description": "index.ts, knowledge.validator.handler.ts, knowledge.validator.manager.ts, validate.runner.ts"
+    },
+    {
+      "path": "scopes/media.github",
+      "type": "scope",
+      "scope": "media.github",
+      "description": "index.ts, media.github.handler.ts"
+    },
+    {
+      "path": "scopes/search.indexer",
+      "type": "scope",
+      "scope": "search.indexer",
+      "description": "index.ts, indexer.runner.ts, search.indexer.handler.ts, search.indexer.manager.ts"
+    }
+  ],
+  "mergers": [
+    {
+      "path": "mergers/README.md",
+      "type": "merger"
+    },
+    {
+      "path": "mergers/crawl-to-parse",
+      "type": "merger"
+    },
+    {
+      "path": "mergers/knowledge-to-site",
+      "type": "merger"
+    }
+  ],
+  "flows": [
+    {
+      "path": "flows/README.md",
+      "type": "flow"
+    },
+    {
+      "path": "flows/build.flow.ts",
+      "type": "flow"
+    },
+    {
+      "path": "flows/crawl.flow.ts",
+      "type": "flow"
+    },
+    {
+      "path": "flows/parse.flow.ts",
+      "type": "flow"
+    }
+  ],
+  "strappers": [
+    {
+      "path": "strappers/strapper.ts",
+      "type": "strapper"
+    }
+  ],
+  "core": [
+    {
+      "path": "core/config",
+      "type": "core"
+    },
+    {
+      "path": "core/platform",
+      "type": "core"
+    }
+  ]
+}

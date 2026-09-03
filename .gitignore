@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.smo/
+.env
+.env.local
+data/raw/
+data/processed/
+data/manifest/
+.tigris-cache/
+colab/.checkpoints/
+.vercel/
+.next/
+out/
+*.tsbuildinfo
+.DS_Store
+*.log

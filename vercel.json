@@ -1,0 +1,10 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "bun run build",
+  "installCommand": "bun install",
+  "outputDirectory": "apps/web/.next",
+  "functions": {
+    "apps/web/app/api/**/*.ts": { "runtime": "edge" }
+  },
+  "regions": ["iad1"]
+}

@@ -1,0 +1,36 @@
+{
+  "name": "gnulense",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch apps/web/app/page.tsx || bun --watch strappers/strapper.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "crawl:shard": "bun run scopes/ingestion.crawler/crawler.runner.ts",
+    "parse": "bun run scopes/knowledge.parser/parser.runner.ts",
+    "index": "bun run scopes/search.indexer/indexer.runner.ts",
+    "validate": "bun run scopes/knowledge.validator/validate.runner.ts",
+    "validate:shards": "bun run scripts/validate-shards.ts",
+    "sync": "bun run scripts/sync-from-tigris.ts",
+    "cron": "bun run scripts/cron/schedule.ts"
+  },
+  "dependencies": {
+    "parse5": "^7.1.2",
+    "cheerio": "^1.0.0-rc.12",
+    "flexsearch": "^0.7.43",
+    "@aws-sdk/client-s3": "^3.600.0",
+    "mongodb": "^6.8.0",
+    "ajv": "^8.12.0",
+    "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.3.0",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.0.0"
+  }
+}

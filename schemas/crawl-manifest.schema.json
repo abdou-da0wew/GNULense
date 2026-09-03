@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CrawlManifestEntry",
+  "type": "object",
+  "required": ["url", "sha256", "contentType", "statusCode", "fetchedAt", "shardId"],
+  "properties": {
+    "url": { "type": "string", "format": "uri" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "contentType": { "type": "string" },
+    "statusCode": { "type": "integer", "minimum": 100, "maximum": 599 },
+    "fetchedAt": { "type": "string", "format": "date-time" },
+    "storageKey": { "type": "string" },
+    "cdnUrl": { "type": "string", "format": "uri" },
+    "shardId": { "type": "integer", "minimum": 0, "maximum": 10 },
+    "externalAsset": { "type": "boolean" }
+  }
+}

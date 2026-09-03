@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GNULenseDocument",
+  "type": "object",
+  "required": ["sourceUrl", "slug", "title", "sha256", "parsedAt", "contentType", "sections"],
+  "properties": {
+    "sourceUrl": { "type": "string", "format": "uri" },
+    "slug": { "type": "string", "pattern": "^[a-z0-9-/_]+$" },
+    "title": { "type": "string", "minLength": 1 },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "parsedAt": { "type": "string", "format": "date-time" },
+    "contentType": { "type": "string" },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "level", "heading", "content", "html"],
+        "properties": {
+          "id": { "type": "string" },
+          "level": { "type": "integer", "minimum": 1, "maximum": 6 },
+          "heading": { "type": "string" },
+          "content": { "type": "string" },
+          "html": { "type": "string" },
+          "codeBlocks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["code"],
+              "properties": {
+                "language": { "type": ["string", "null"] },
+                "code": { "type": "string" }
+              }
+            }
+          },
+          "tables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "headers": { "type": "array", "items": { "type": "string" } },
+                "rows": { "type": "array", "items": { "type": "array", "items": { "type": "string" } } }
+              }
+            }
+          },
+          "anchors": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}
