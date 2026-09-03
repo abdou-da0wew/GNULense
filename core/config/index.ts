@@ -5,6 +5,8 @@ export type AppConfig = {
     endpoint: string | null
     region: string
     bucket: string | null
+    bucketRaw: string | null
+    bucketProcessed: string | null
     accessKey: string | null
     secretKey: string | null
     enabled: boolean
@@ -39,10 +41,12 @@ export type AppConfig = {
 }
 
 export function getConfig(): AppConfig {
-  const tigrisBucket = process.env.TIGRIS_BUCKET ?? null
-  const tigrisAccess = process.env.TIGRIS_ACCESS_KEY ?? null
-  const tigrisSecret = process.env.TIGRIS_SECRET_KEY ?? null
-  const tigrisEndpoint = process.env.TIGRIS_ENDPOINT ?? null
+  const tigrisEndpoint = process.env.TIGRIS_ENDPOINT ?? process.env.AWS_ENDPOINT_URL_S3 ?? null
+  const tigrisAccess = process.env.TIGRIS_ACCESS_KEY ?? process.env.AWS_ACCESS_KEY_ID ?? null
+  const tigrisSecret = process.env.TIGRIS_SECRET_KEY ?? process.env.AWS_SECRET_ACCESS_KEY ?? null
+  const tigrisBucket = process.env.TIGRIS_BUCKET ?? process.env.TIGRIS_BUCKET_RAW ?? "gnu-lens-raw"
+  const tigrisBucketRaw = process.env.TIGRIS_BUCKET_RAW ?? tigrisBucket
+  const tigrisBucketProcessed = process.env.TIGRIS_BUCKET_PROCESSED ?? "gnu-lens-processed"
   const mongoUri = process.env.MONGODB_URI ?? null
   const githubToken = process.env.GITHUB_TOKEN ?? null
   const railwayUrl = process.env.RAILWAY_BACKEND_URL ?? null
@@ -52,11 +56,13 @@ export function getConfig(): AppConfig {
     port: Number(process.env.PORT ?? 3000),
     tigris: {
       endpoint: tigrisEndpoint,
-      region: process.env.TIGRIS_REGION ?? "auto",
+      region: process.env.TIGRIS_REGION ?? process.env.AWS_REGION ?? "auto",
       bucket: tigrisBucket,
+      bucketRaw: tigrisBucketRaw,
+      bucketProcessed: tigrisBucketProcessed,
       accessKey: tigrisAccess,
       secretKey: tigrisSecret,
-      enabled: Boolean(tigrisBucket && tigrisAccess && tigrisSecret),
+      enabled: Boolean(tigrisEndpoint && tigrisAccess && tigrisSecret),
     },
     mongo: {
       uri: mongoUri,

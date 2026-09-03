@@ -14,17 +14,28 @@ function getClient(): S3Client {
   })
 }
 
-function bucket(): string {
-  const b = getConfig().tigris.bucket
-  if (!b) throw new Error("TIGRIS_BUCKET not set")
+function bucketRaw(): string {
+  const b = getConfig().tigris.bucketRaw ?? getConfig().tigris.bucket
+  if (!b) throw new Error("TIGRIS_BUCKET_RAW not set")
   return b
+}
+
+function bucketProcessed(): string {
+  const b = getConfig().tigris.bucketProcessed
+  if (!b) return bucketRaw()
+  return b
+}
+
+function bucketForKey(key: string): string {
+  if (key.startsWith("processed/") || key.startsWith("search/") || key.startsWith("manifest/")) return bucketProcessed()
+  return bucketRaw()
 }
 
 export async function tigrisPut(key: string, body: Uint8Array | string, contentType = "application/octet-stream"): Promise<void> {
   const client = getClient()
   await client.send(
     new PutObjectCommand({
-      Bucket: bucket(),
+      Bucket: bucketForKey(key),
       Key: key,
       Body: typeof body === "string" ? Buffer.from(body, "utf-8") : Buffer.from(body),
       ContentType: contentType,
@@ -34,7 +45,7 @@ export async function tigrisPut(key: string, body: Uint8Array | string, contentT
 
 export async function tigrisGet(key: string): Promise<Uint8Array> {
   const client = getClient()
-  const res = await client.send(new GetObjectCommand({ Bucket: bucket(), Key: key }))
+  const res = await client.send(new GetObjectCommand({ Bucket: bucketForKey(key), Key: key }))
   const bytes = await res.Body?.transformToByteArray()
   if (!bytes) throw new Error(`Tigris get empty for ${key}`)
   return bytes
@@ -43,7 +54,7 @@ export async function tigrisGet(key: string): Promise<Uint8Array> {
 export async function tigrisExists(key: string): Promise<boolean> {
   const client = getClient()
   try {
-    await client.send(new HeadObjectCommand({ Bucket: bucket(), Key: key }))
+    await client.send(new HeadObjectCommand({ Bucket: bucketForKey(key), Key: key }))
     return true
   } catch {
     return false
@@ -53,12 +64,14 @@ export async function tigrisExists(key: string): Promise<boolean> {
 export async function tigrisUsageBytes(): Promise<number> {
   const client = getClient()
   let total = 0
-  let token: string | undefined
-  do {
-    const res = await client.send(new ListObjectsV2Command({ Bucket: bucket(), ContinuationToken: token }))
-    for (const obj of res.Contents ?? []) total += obj.Size ?? 0
-    token = res.NextContinuationToken
-  } while (token)
+  for (const b of [bucketRaw(), bucketProcessed()]) {
+    let token: string | undefined
+    do {
+      const res = await client.send(new ListObjectsV2Command({ Bucket: b, ContinuationToken: token }))
+      for (const obj of res.Contents ?? []) total += obj.Size ?? 0
+      token = res.NextContinuationToken
+    } while (token)
+  }
   return total
 }
 
