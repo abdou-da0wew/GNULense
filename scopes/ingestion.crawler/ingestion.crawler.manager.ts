@@ -45,11 +45,12 @@ export class CrawlManager {
   }
 
   async run(): Promise<void> {
-    const seeds = ["https://www.gnu.org/"]
+    const seeds = process.env.SEED_URL ? [process.env.SEED_URL] : ["https://www.gnu.org/", "https://www.gnu.org/software/software.html"]
+    const seedSet = new Set(seeds.map(s => this.normalize(s)))
     const db = await this.getDbSafe()
     const done = db ? new Set((await db.collection("crawl_manifest").distinct("url")) as string[]) : new Set<string>()
     const checkpoints = db ? await db.collection("shard_checkpoints").find().sort({ stoppedAt: -1 }).toArray() : []
-    this.logger.info("crawl.start", { shardId: this.shardId, shardTotal: this.shardTotal, done: done.size, checkpoints: checkpoints.length })
+    this.logger.info("crawl.start", { shardId: this.shardId, shardTotal: this.shardTotal, seeds, done: done.size, checkpoints: checkpoints.length })
 
     for (const s of seeds) if (!done.has(s)) this.queue.push(s) // seeds always enqueued, sharding via shouldHandle on discovered links only
 
@@ -84,8 +85,8 @@ export class CrawlManager {
           await new Promise(r => setTimeout(r, 50))
           continue
         }
-        // sharding: only this shard handles its slice, others skip but count as seen to avoid re-enqueue
-        if (!this.shouldHandle(url)) {
+        const isSeed = seedSet.has(this.normalize(url))
+        if (!isSeed && !this.shouldHandle(url)) {
           this.seen.add(url)
           continue
         }
