@@ -45,10 +45,32 @@ export class CrawlManager {
   }
 
   async run(): Promise<void> {
-    const seeds = process.env.SEED_URL ? [process.env.SEED_URL] : ["https://www.gnu.org/", "https://www.gnu.org/software/software.html"]
+    const seeds = process.env.SEED_URL ? [process.env.SEED_URL] : ["https://www.gnu.org/", "https://www.gnu.org/software/software.html", "https://www.gnu.org/philosophy/philosophy.html"]
     const seedSet = new Set(seeds.map(s => this.normalize(s)))
     const db = await this.getDbSafe()
-    const done = db ? new Set((await db.collection("crawl_manifest").distinct("url")) as string[]) : new Set<string>()
+    let done: Set<string>
+    if (db) {
+      try { done = new Set((await db.collection("crawl_manifest").distinct("url")) as string[]) } catch { done = new Set<string>() }
+      if (done.size === 0) {
+        // fallback to Tigris manifest if Mongo empty/down — prevents recrawl from scratch
+        try {
+          const { tigrisGet } = await import("@core/platform/storage.tigris.js")
+          const manifestBytes = await tigrisGet("manifest/manifest.json")
+          const manifest = JSON.parse(new TextDecoder().decode(manifestBytes))
+          done = new Set((manifest as any[]).map((e: any) => e.url))
+          this.logger.info("crawl.resume_from_tigris", { done: done.size })
+        } catch {}
+      }
+    } else {
+      done = new Set<string>()
+      try {
+        const { tigrisGet } = await import("@core/platform/storage.tigris.js")
+        const manifestBytes = await tigrisGet("manifest/manifest.json")
+        const manifest = JSON.parse(new TextDecoder().decode(manifestBytes))
+        done = new Set((manifest as any[]).map((e: any) => e.url))
+        this.logger.info("crawl.resume_from_tigris", { done: done.size })
+      } catch {}
+    }
     const checkpoints = db ? await db.collection("shard_checkpoints").find().sort({ stoppedAt: -1 }).toArray() : []
     this.logger.info("crawl.start", { shardId: this.shardId, shardTotal: this.shardTotal, seeds, done: done.size, checkpoints: checkpoints.length })
 
@@ -57,6 +79,19 @@ export class CrawlManager {
     let count = 0
     let lastUrl = ""
     const onStop = async (reason: string) => {
+      // save manifest to Tigris for resume without Mongo - full done set every 20
+      try {
+        const { tigrisPut, tigrisGet } = await import("@core/platform/storage.tigris.js")
+        const allDone = [...done, ...this.seen]
+        await tigrisPut(`manifest/manifest-shard-${this.shardId}.json`, JSON.stringify(allDone.slice(-500)), "application/json")
+        try {
+          const existing = JSON.parse(new TextDecoder().decode(await tigrisGet("manifest/manifest.json")))
+          const merged = [...new Set([...existing, ...allDone])]
+          await tigrisPut("manifest/manifest.json", JSON.stringify(merged), "application/json")
+        } catch {
+          await tigrisPut("manifest/manifest.json", JSON.stringify(allDone), "application/json")
+        }
+      } catch {}
       if (db) {
         await db.collection("shard_checkpoints").insertOne({
           shardId: this.shardId,
