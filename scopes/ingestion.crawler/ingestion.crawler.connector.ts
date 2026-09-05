@@ -60,6 +60,23 @@ export class CrawlConnector {
     } catch {}
   }
 
+  extractMedia(html: string, baseUrl: string): string[] {
+    const media: string[] = []
+    const reMedia = /<(?:img|video|audio|source|link)[^>]+(?:src|href)=["']([^"']+)["']/gi
+    let m: RegExpExecArray | null
+    while ((m = reMedia.exec(html))) {
+      try {
+        const href = m[1]
+        if (href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("javascript:") || href.startsWith("data:")) continue
+        const abs = new URL(href, baseUrl).toString()
+        const u = new URL(abs)
+        if (!u.hostname.endsWith("gnu.org")) continue
+        if (abs.match(/\.(png|jpg|jpeg|gif|webp|svg|ico|mp4|webm|mp3|ogg|wav|pdf)$/i) || abs.includes("/graphics/")) media.push(abs)
+      } catch {}
+    }
+    return [...new Set(media)]
+  }
+
   extractLinks(html: string, baseUrl: string): string[] {
     const links: string[] = []
     const re = /<a[^>]+href=["']([^"']+)["']/gi

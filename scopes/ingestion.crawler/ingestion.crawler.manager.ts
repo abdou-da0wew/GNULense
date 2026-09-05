@@ -176,8 +176,12 @@ export class CrawlManager {
         return
       }
       const ext = this.extFrom(url, contentType)
-      const path = githubMediaPathForHash(sha256, ext)
-      const { cdnUrl } = await githubPutMedia(path, bytes, `media: ${url} ${sha256.slice(0, 8)}`)
+      const path = `media/${sha256.slice(0,2)}/${sha256}${ext}` // for Tigris, keep github path as fallback
+      const mediaKey = `media/${sha256.slice(0,2)}/${sha256}${ext}`
+      await tigrisPut(mediaKey, bytes, contentType)
+      const cdnUrl = `https://gnu-lens-raw.t3.storage.dev/${mediaKey}`
+      // also keep github as backup if needed: await githubPutMedia(path, bytes, `media: ${url} ${sha256.slice(0, 8)}`).catch(()=>{})
+      
       await this.saveManifest(url, sha256, contentType, status, undefined, cdnUrl, false)
       this.logger.info("crawl.media_github", { url, sha256, cdnUrl, durationMs: Date.now() - start })
       return
@@ -200,10 +204,17 @@ export class CrawlManager {
     await this.saveManifest(url, sha256, contentType, status, key, undefined, false)
 
     if (contentType.includes("text/html")) {
-      const links = this.connector.extractLinks(bytes.toString("utf-8"), url)
+      const htmlStr = bytes.toString("utf-8")
+      const links = this.connector.extractLinks(htmlStr, url)
       for (const l of links) {
         const n = this.normalize(l)
         if (!this.seen.has(n) && this.shouldHandle(n)) this.queue.push(n)
+      }
+      // also queue media for Tigris media/ store (no hash sharding, all shards fetch media they see)
+      const media = this.connector.extractMedia(htmlStr, url)
+      for (const m of media) {
+        const n = this.normalize(m)
+        if (!this.seen.has(n)) this.queue.push(n)
       }
     }
 
