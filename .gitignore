@@ -14,3 +14,4 @@ out/
 *.tsbuildinfo
 .DS_Store
 *.log
+GNULense-Frontend/

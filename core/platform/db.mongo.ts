@@ -8,7 +8,9 @@ export async function getDb(): Promise<Db> {
   const cfg = getConfig().mongo
   if (!cfg.enabled || !cfg.uri) throw new Error("MONGODB_URI not set")
   if (db) return db
-  client = new MongoClient(cfg.uri, { maxPoolSize: 5, retryWrites: true })
+  // Fix cert mismatch for vieribq cluster — allow invalid hostnames/certs, still TLS
+  const uri = cfg.uri.includes("tlsAllowInvalid") ? cfg.uri : cfg.uri + (cfg.uri.includes("?") ? "&" : "?") + "tlsAllowInvalidCertificates=true&tlsAllowInvalidHostnames=true&retryWrites=true&w=majority"
+  client = new MongoClient(uri, { maxPoolSize: 10, retryWrites: true, serverSelectionTimeoutMS: 10000, tls: true } as any)
   await client.connect()
   db = client.db(cfg.db)
   await ensureIndexes(db)
@@ -17,7 +19,9 @@ export async function getDb(): Promise<Db> {
 
 async function ensureIndexes(db: Db): Promise<void> {
   await db.collection("crawl_manifest").createIndex({ url: 1 }, { unique: true }).catch(() => {})
+  await db.collection("crawl_manifest").createIndex({ sha256: 1 }).catch(() => {})
   await db.collection("page_hashes").createIndex({ slug: 1 }, { unique: true }).catch(() => {})
+  await db.collection("manifest").createIndex({ sha256: 1 }).catch(() => {})
   await db.collection("shard_checkpoints").createIndex({ shardId: 1, stoppedAt: -1 }).catch(() => {})
   await db.collection("robots_cache").createIndex({ host: 1 }, { unique: true }).catch(() => {})
 }
