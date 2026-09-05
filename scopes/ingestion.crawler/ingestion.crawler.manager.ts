@@ -179,7 +179,7 @@ export class CrawlManager {
       const path = `media/${sha256.slice(0,2)}/${sha256}${ext}` // for Tigris, keep github path as fallback
       const mediaKey = `media/${sha256.slice(0,2)}/${sha256}${ext}`
       await tigrisPut(mediaKey, bytes, contentType)
-      const cdnUrl = `https://gnu-lens-raw.t3.storage.dev/${mediaKey}`
+      const cdnUrl = `/api/media?key=${mediaKey}`
       // also keep github as backup if needed: await githubPutMedia(path, bytes, `media: ${url} ${sha256.slice(0, 8)}`).catch(()=>{})
       
       await this.saveManifest(url, sha256, contentType, status, undefined, cdnUrl, false)
